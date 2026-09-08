@@ -1,10 +1,11 @@
-import json, os, shutil, socket, subprocess, sys, time
+import base64, io, json, os, shutil, socket, subprocess, sys, time
 import requests
 from websocket import create_connection
 from gologin import GoLogin
 
 TOKEN = os.environ['GOLOGIN_TOKEN'].strip()
-URL = os.environ.get('PROBE_URL', 'http://127.0.0.1:8000/m.html')
+HTML = io.open('web/m.html', encoding='utf-8').read() if os.path.exists('web/m.html') else ''
+URL = 'data:text/html;base64,' + base64.b64encode(HTML.encode()).decode()
 
 
 def free_port():
