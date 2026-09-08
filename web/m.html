@@ -1,0 +1,27 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>window metrics</title></head>
+<body><pre id="d">running</pre>
+<script>
+(function(){
+  function g(f){try{var v=f();return v===undefined?"undef":String(v);}catch(e){return "ERR:"+(e&&e.name);}}
+  function mq(q){try{return window.matchMedia(q).matches?1:0;}catch(e){return "E";}}
+  function run(){
+    var A={};
+    A.geom=g(function(){return [outerWidth,outerHeight,innerWidth,innerHeight,screenX,screenY,screenLeft,screenTop].join(",");});
+    A.scr=g(function(){return [screen.width,screen.height,screen.availWidth,screen.availHeight,screen.availLeft,screen.availTop].join(",");});
+    A.dpr=g(function(){return devicePixelRatio;});
+    A.ua=g(function(){return navigator.userAgent;});
+    A.plat=g(function(){return navigator.platform;});
+    A.hasFocus=g(function(){return document.hasFocus();});
+    A.paint=g(function(){return performance.getEntriesByType("paint").map(function(e){return e.name;}).join("|")||"none";});
+    A.ptr=[mq("(pointer: none)"),mq("(hover: none)"),mq("(any-pointer: none)"),mq("(pointer: fine)")].join(",");
+    A.bars=g(function(){return [toolbar.visible,menubar.visible,scrollbars.visible].join(",");});
+    A.frameDeltaW=g(function(){return outerWidth-innerWidth;});
+    A.frameDeltaH=g(function(){return outerHeight-innerHeight;});
+    A.equalWidth=g(function(){return outerWidth===innerWidth;});
+    document.getElementById("d").textContent=JSON.stringify(A,null,1);
+  }
+  function go(){setTimeout(run,80);}
+  if(document.readyState==="complete"){go();}else{window.addEventListener("load",go);}
+})();
+</script></body></html>
