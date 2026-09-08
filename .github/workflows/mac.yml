@@ -6,16 +6,20 @@ jobs:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
-      - run: python3 -m pip install --quiet websocket-client requests
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --quiet websocket-client requests
       - name: locate chrome
         run: |
           P="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
           if [ ! -x "$P" ]; then brew install --cask google-chrome; fi
           "$P" --version
+          echo "CHROME_BIN=$P" >> $GITHUB_ENV
       - name: serve page
         run: |
           cd web && nohup python3 -m http.server 8000 >/dev/null 2>&1 &
-          sleep 2
+          sleep 3
           curl -s -o /dev/null -w "page http %{http_code}\n" http://127.0.0.1:8000/m.html
       - name: probe
-        run: python3 probe.py
+        run: python probe.py
