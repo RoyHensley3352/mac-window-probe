@@ -1,0 +1,21 @@
+name: mac-gologin-metrics
+on:
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --quiet gologin requests websocket-client
+      - name: serve page
+        run: |
+          cd web && nohup python3 -m http.server 8000 >/dev/null 2>&1 &
+          sleep 3
+          curl -s -o /dev/null -w "page http %{http_code}\n" http://127.0.0.1:8000/m.html
+      - name: gologin probe
+        env:
+          GOLOGIN_TOKEN: ${{ secrets.GOLOGIN_TOKEN }}
+        run: python glmac.py
