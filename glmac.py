@@ -65,25 +65,75 @@ def measure(profile_id, headless, label):
 
 
 gl0 = GoLogin({'token': TOKEN})
-pid = os.environ.get('PROFILE_ID', '').strip()
-created = False
-if not pid:
-    prof = gl0.createProfileRandomFingerprint({'os': 'mac', 'name': 'ada-macprobe'})
-    pid = prof['id'] if isinstance(prof, dict) else prof
-    created = True
-print('profile=%s created=%s' % (pid, created), flush=True)
-res = [measure(pid, False, 'headed'), measure(pid, True, 'headless')]
-if created:
+API = 'https://api.gologin.com'
+HDR = {'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json'}
+RESOLUTIONS = [r.strip() for r in os.environ.get(
+    'RESOLUTIONS', '1440x900,1280x800,1024x640').split(',') if r.strip()]
+
+
+def set_resolution(pid, res):
     try:
-        gl0.delete(pid); print('profile deleted', flush=True)
+        r = requests.get('%s/browser/%s' % (API, pid), headers=HDR, timeout=40)
+        body = r.json()
+        nav = body.get('navigator') or {}
+        nav['resolution'] = res
+        body['navigator'] = nav
+        u = requests.put('%s/browser/%s' % (API, pid), headers=HDR,
+                         data=json.dumps(body), timeout=40)
+        return u.status_code
     except Exception as e:
-        print('delete failed: %s' % e, flush=True)
-print(json.dumps(res, indent=1))
+        return '%s: %s' % (type(e).__name__, e)
+
+
+def read_resolution(pid):
+    try:
+        r = requests.get('%s/browser/%s' % (API, pid), headers=HDR, timeout=40)
+        return (r.json().get('navigator') or {}).get('resolution')
+    except Exception:
+        return None
+
+
+results = []
+fixed = os.environ.get('PROFILE_ID', '').strip()
+targets = [fixed] if fixed else []
+created = []
+if not fixed:
+    for res in RESOLUTIONS:
+        prof = gl0.createProfileRandomFingerprint({'os': 'mac', 'name': 'ada-macprobe-' + res})
+        pid = prof['id'] if isinstance(prof, dict) else prof
+        code = set_resolution(pid, res)
+        print('profile=%s wanted=%s put=%s actual=%s' % (pid, res, code, read_resolution(pid)), flush=True)
+        created.append(pid)
+        targets.append(pid)
+
+for pid in targets:
+    res = read_resolution(pid)
+    for hl in (False, True):
+        out = measure(pid, hl, ('headless' if hl else 'headed'))
+        out['profile'] = pid
+        out['profile_resolution'] = res
+        results.append(out)
+
+for pid in created:
+    try:
+        gl0.delete(pid); print('deleted %s' % pid, flush=True)
+    except Exception as e:
+        print('delete failed %s: %s' % (pid, e), flush=True)
+
+print(json.dumps(results, indent=1))
 print()
-for r in res:
+print('%-10s %-9s %-26s %-7s %-5s %-34s %s' % (
+    'profileRes', 'mode', 'browser', 'eqWidth', 'dW', 'geom', 'scr'))
+for r in results:
     d = r.get('data') or {}
-    print('%-9s browser=%-26s equalWidth=%-6s dW=%-4s dH=%-4s geom=%-34s scr=%s' % (
-        r['label'], r.get('browser'), d.get('equalWidth'), d.get('frameDeltaW'),
-        d.get('frameDeltaH'), d.get('geom'), d.get('scr')))
+    print('%-10s %-9s %-26s %-7s %-5s %-34s %s' % (
+        r.get('profile_resolution'), r['label'], r.get('browser'),
+        d.get('equalWidth'), d.get('frameDeltaW'), d.get('geom'), d.get('scr')))
     if r.get('error'):
         print('   ERROR: %s' % r['error'])
+print()
+print('--- feature policy summary ---')
+for r in results:
+    d = r.get('data') or {}
+    print('%-10s %-9s nfeat=%s ptr=%s' % (r.get('profile_resolution'), r['label'],
+                                          d.get('nfeat'), d.get('ptr')))
