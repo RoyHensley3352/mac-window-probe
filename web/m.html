@@ -5,6 +5,20 @@
 (function(){
   function g(f){try{var v=f();return v===undefined?"undef":String(v);}catch(e){return "ERR:"+(e&&e.name);}}
   function mq(q){try{return window.matchMedia(q).matches?1:0;}catch(e){return "E";}}
+  function pol(){try{return document.featurePolicy||document.permissionsPolicy||null;}catch(e){return null;}}
+  function featlist(){
+    var p=pol();
+    if(!p||typeof p.features!=="function"){return null;}
+    try{return p.features().slice().sort();}catch(e){return null;}
+  }
+  function allowmap(list){
+    var p=pol(),o={};
+    if(!p||typeof p.allowsFeature!=="function"||!list){return o;}
+    for(var i=0;i<list.length;i++){
+      try{o[list[i]]=p.allowsFeature(list[i]);}catch(e){o[list[i]]="E";}
+    }
+    return o;
+  }
   function run(){
     var A={};
     A.geom=g(function(){return [outerWidth,outerHeight,innerWidth,innerHeight,screenX,screenY,screenLeft,screenTop].join(",");});
@@ -19,6 +33,13 @@
     A.frameDeltaW=g(function(){return outerWidth-innerWidth;});
     A.frameDeltaH=g(function(){return outerHeight-innerHeight;});
     A.equalWidth=g(function(){return outerWidth===innerWidth;});
+    var fl=featlist();
+    A.nfeat=fl?fl.length:null;
+    A.features=fl;
+    A.allows=allowmap(fl);
+    A.maxTouchPoints=g(function(){return navigator.maxTouchPoints;});
+    A.hwc=g(function(){return navigator.hardwareConcurrency;});
+    A.devmem=g(function(){return navigator.deviceMemory;});
     document.getElementById("d").textContent=JSON.stringify(A,null,1);
   }
   function go(){setTimeout(run,80);}
