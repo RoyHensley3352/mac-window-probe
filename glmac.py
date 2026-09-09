@@ -69,61 +69,101 @@ API = 'https://api.gologin.com'
 HDR = {'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json'}
 RESOLUTIONS = [r.strip() for r in os.environ.get(
     'RESOLUTIONS', '1440x900,1280x800,1024x640').split(',') if r.strip()]
+NAME_PREFIX = 'ada-macprobe'
+
+
+def list_profiles():
+    try:
+        r = requests.get('%s/browser/v2' % API, headers=HDR, timeout=40)
+        body = r.json()
+        return body.get('profiles', body) if isinstance(body, dict) else body
+    except Exception as e:
+        print('list failed: %s' % e, flush=True)
+        return []
+
+
+def sweep_leftovers():
+    n = 0
+    for p in list_profiles() or []:
+        try:
+            if str(p.get('name', '')).startswith(NAME_PREFIX):
+                requests.delete('%s/browser/%s' % (API, p['id']), headers=HDR, timeout=40)
+                print('swept leftover %s %s' % (p['id'], p.get('name')), flush=True)
+                n += 1
+        except Exception as e:
+            print('sweep failed: %s' % e, flush=True)
+    return n
+
+
+def make_profile(res):
+    try:
+        prof = gl0.createProfileRandomFingerprint({'os': 'mac', 'name': '%s-%s' % (NAME_PREFIX, res)})
+    except Exception as e:
+        print('create raised for %s: %s' % (res, e), flush=True)
+        return None
+    if not isinstance(prof, dict) or 'id' not in prof:
+        print('create returned no id for %s: %s' % (res, str(prof)[:300]), flush=True)
+        return None
+    return prof['id']
 
 
 def set_resolution(pid, res):
     try:
-        r = requests.get('%s/browser/%s' % (API, pid), headers=HDR, timeout=40)
-        body = r.json()
+        body = requests.get('%s/browser/%s' % (API, pid), headers=HDR, timeout=40).json()
         nav = body.get('navigator') or {}
         nav['resolution'] = res
         body['navigator'] = nav
-        u = requests.put('%s/browser/%s' % (API, pid), headers=HDR,
-                         data=json.dumps(body), timeout=40)
-        return u.status_code
+        return requests.put('%s/browser/%s' % (API, pid), headers=HDR,
+                            data=json.dumps(body), timeout=40).status_code
     except Exception as e:
         return '%s: %s' % (type(e).__name__, e)
 
 
 def read_resolution(pid):
     try:
-        r = requests.get('%s/browser/%s' % (API, pid), headers=HDR, timeout=40)
-        return (r.json().get('navigator') or {}).get('resolution')
+        b = requests.get('%s/browser/%s' % (API, pid), headers=HDR, timeout=40).json()
+        return (b.get('navigator') or {}).get('resolution')
     except Exception:
         return None
 
 
-results = []
-fixed = os.environ.get('PROFILE_ID', '').strip()
-targets = [fixed] if fixed else []
-created = []
-if not fixed:
-    for res in RESOLUTIONS:
-        prof = gl0.createProfileRandomFingerprint({'os': 'mac', 'name': 'ada-macprobe-' + res})
-        pid = prof['id'] if isinstance(prof, dict) else prof
-        code = set_resolution(pid, res)
-        print('profile=%s wanted=%s put=%s actual=%s' % (pid, res, code, read_resolution(pid)), flush=True)
-        created.append(pid)
-        targets.append(pid)
-
-for pid in targets:
-    res = read_resolution(pid)
-    for hl in (False, True):
-        out = measure(pid, hl, ('headless' if hl else 'headed'))
-        out['profile'] = pid
-        out['profile_resolution'] = res
-        results.append(out)
-
-for pid in created:
+def drop(pid):
     try:
-        gl0.delete(pid); print('deleted %s' % pid, flush=True)
+        requests.delete('%s/browser/%s' % (API, pid), headers=HDR, timeout=40)
+        print('deleted %s' % pid, flush=True)
     except Exception as e:
         print('delete failed %s: %s' % (pid, e), flush=True)
+
+
+print('menubar=%s' % os.environ.get('MENUBAR', '?'), flush=True)
+print('swept=%d' % sweep_leftovers(), flush=True)
+
+results = []
+fixed = os.environ.get('PROFILE_ID', '').strip()
+if fixed:
+    res = read_resolution(fixed)
+    for hl in (False, True):
+        o = measure(fixed, hl, 'headless' if hl else 'headed')
+        o['profile'] = fixed; o['profile_resolution'] = res
+        results.append(o)
+else:
+    for res in RESOLUTIONS:
+        pid = make_profile(res)
+        if not pid:
+            continue
+        code = set_resolution(pid, res)
+        actual = read_resolution(pid)
+        print('profile=%s wanted=%s put=%s actual=%s' % (pid, res, code, actual), flush=True)
+        for hl in (False, True):
+            o = measure(pid, hl, 'headless' if hl else 'headed')
+            o['profile'] = pid; o['profile_resolution'] = actual
+            results.append(o)
+        drop(pid)
 
 print(json.dumps(results, indent=1))
 print()
 print('%-10s %-9s %-26s %-7s %-5s %-34s %s' % (
-    'profileRes', 'mode', 'browser', 'eqWidth', 'dW', 'geom', 'scr'))
+    'profRes', 'mode', 'browser', 'eqWidth', 'dW', 'geom', 'scr'))
 for r in results:
     d = r.get('data') or {}
     print('%-10s %-9s %-26s %-7s %-5s %-34s %s' % (
@@ -132,8 +172,8 @@ for r in results:
     if r.get('error'):
         print('   ERROR: %s' % r['error'])
 print()
-print('--- feature policy summary ---')
+print('--- policy / pointer ---')
 for r in results:
     d = r.get('data') or {}
-    print('%-10s %-9s nfeat=%s ptr=%s' % (r.get('profile_resolution'), r['label'],
-                                          d.get('nfeat'), d.get('ptr')))
+    print('%-10s %-9s nfeat=%-5s ptr=%s' % (r.get('profile_resolution'), r['label'],
+                                            d.get('nfeat'), d.get('ptr')))
