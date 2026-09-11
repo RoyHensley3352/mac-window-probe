@@ -1,0 +1,28 @@
+name: mac-v3a-fire
+on:
+  workflow_dispatch:
+jobs:
+  fire:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --quiet websocket-client
+      - name: locate chrome
+        run: |
+          P="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          if [ ! -x "$P" ]; then brew install --cask google-chrome; fi
+          "$P" --version
+          echo "CHROME_BIN=$P" >> $GITHUB_ENV
+      - name: fire test
+        run: python macfire.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macfire-${{ matrix.os }}
+          path: macfire_result.json
