@@ -15,6 +15,8 @@ o.win=[outerWidth,innerWidth,outerHeight,innerHeight,screenX,screenY];
 o.mq={hoverNone:matchMedia("(hover: none)").matches,pointerNone:matchMedia("(pointer: none)").matches,
       anyNone:matchMedia("(any-pointer: none)").matches,hoverHover:matchMedia("(hover: hover)").matches};
 try{var fp=document.featurePolicy,f=fp.features();o.n=f.length;
+  o.allows={bt:fp.allowsFeature("bluetooth"),unload:fp.allowsFeature("unload"),
+            hid:fp.allowsFeature("hid"),usb:fp.allowsFeature("usb")};
   o.has={hid:f.indexOf("hid")>=0,usb:f.indexOf("usb")>=0,xr:f.indexOf("xr-spatial-tracking")>=0,
          chvh:f.indexOf("ch-viewport-height")>=0,bt:f.indexOf("bluetooth")>=0,
          attr:f.indexOf("attribution-reporting")>=0,ss:f.indexOf("shared-storage")>=0,
