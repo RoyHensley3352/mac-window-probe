@@ -1,0 +1,48 @@
+name: mac-sweep
+on:
+  workflow_dispatch:
+jobs:
+  sweep:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --quiet websocket-client requests
+      - name: fetch CfT mac builds
+        run: |
+          python - <<'EOF'
+          import json,os,urllib.request,zipfile,io
+          U="https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json"
+          d=json.load(urllib.request.urlopen(U,timeout=60))
+          want=["113","120","130","138","141","145","148","152","153","155"]
+          pick={}
+          for v in d["versions"]:
+              maj=v["version"].split(".")[0]
+              if maj in want: pick[maj]=v
+          os.makedirs("cftmac",exist_ok=True)
+          for maj,v in sorted(pick.items(),key=lambda x:int(x[0])):
+              url=None
+              for c in v["downloads"].get("chrome",[]):
+                  if c["platform"]=="mac-arm64": url=c["url"]
+              if not url: print("skip",maj); continue
+              try:
+                  b=urllib.request.urlopen(url,timeout=180).read()
+                  z=zipfile.ZipFile(io.BytesIO(b))
+                  z.extractall(os.path.join("cftmac",maj))
+                  print("got",maj,v["version"])
+              except Exception as e:
+                  print("fail",maj,e)
+          EOF
+          find cftmac -maxdepth 1 -type d | sort
+      - name: chmod
+        run: |
+          find cftmac -name "Google Chrome for Testing" -type f -exec chmod +x {} \; 2>/dev/null || true
+          find cftmac -path "*Contents/MacOS/*" -type f -exec chmod +x {} \; 2>/dev/null || true
+      - name: sweep
+        run: python macsweep.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macsweep
+          path: macsweep_result.json
