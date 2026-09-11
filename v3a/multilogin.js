@@ -30,7 +30,13 @@ function detect_multilogin() {
   if (has("ch-viewport-height")) {
     return false;
   }
+  if (has("attribution-reporting")) {
+    return false;
+  }
   if (!has("hid") || !has("usb") || !has("xr-spatial-tracking")) {
+    return false;
+  }
+  if (!has("shared-storage") || !has("ch-ua-high-entropy-values")) {
     return false;
   }
   if (has("bluetooth")) {

@@ -1,48 +1,74 @@
 function detect_dolphin_anty() {
-  function unmaskedPair() {
-    var canvas = null;
-    var gl = null;
+  function policyFeatures() {
+    var policy = null;
     try {
-      canvas = document.createElement("canvas");
-      canvas.width = 8;
-      canvas.height = 8;
-      gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+      policy = document.featurePolicy || document.permissionsPolicy;
     } catch (err) {
       void err;
       return null;
     }
-    if (!gl) {
-      return null;
-    }
-    var info = null;
-    try {
-      info = gl.getExtension("WEBGL_debug_renderer_info");
-    } catch (err) {
-      void err;
-      return null;
-    }
-    if (!info) {
+    if (!policy || typeof policy.features !== "function") {
       return null;
     }
     try {
-      return {
-        vendor: gl.getParameter(info.UNMASKED_VENDOR_WEBGL),
-        renderer: gl.getParameter(info.UNMASKED_RENDERER_WEBGL),
-      };
+      return policy.features();
     } catch (err) {
       void err;
       return null;
     }
   }
 
-  var pair = unmaskedPair();
-  if (!pair) {
+  function coreCount() {
+    try {
+      var n = navigator.hardwareConcurrency;
+      return typeof n === "number" ? n : -1;
+    } catch (err) {
+      void err;
+      return -1;
+    }
+  }
+
+  function memoryGib() {
+    try {
+      var m = navigator.deviceMemory;
+      return typeof m === "number" ? m : -1;
+    } catch (err) {
+      void err;
+      return -1;
+    }
+  }
+
+  var features = policyFeatures();
+  if (!features || features.length < 40) {
     return false;
   }
-  if (typeof pair.vendor !== "string" || typeof pair.renderer !== "string") {
+
+  function has(name) {
+    return features.indexOf(name) >= 0;
+  }
+
+  if (has("attribution-reporting")) {
     return false;
   }
-  return pair.vendor === "Google Inc." && pair.renderer === "ANGLE";
+  if (!has("shared-storage") || !has("ch-viewport-height")) {
+    return false;
+  }
+  if (!has("hid") || !has("usb") || !has("xr-spatial-tracking")) {
+    return false;
+  }
+  if (has("bluetooth")) {
+    return false;
+  }
+
+  var cores = coreCount();
+  var mem = memoryGib();
+  if (cores < 1 || cores > 4) {
+    return false;
+  }
+  if (mem < 1 || mem > 8) {
+    return false;
+  }
+  return true;
 }
 
 if (typeof window !== "undefined") {

@@ -1,13 +1,4 @@
 function detect_headless() {
-  function headlessUserAgent() {
-    try {
-      return navigator.userAgent.indexOf("HeadlessChrome") >= 0;
-    } catch (err) {
-      void err;
-      return false;
-    }
-  }
-
   function noPointerDevice() {
     try {
       return window.matchMedia("(hover: none)").matches &&
@@ -77,16 +68,16 @@ function detect_headless() {
     return false;
   }
 
-  if (headlessUserAgent()) {
+  if (noPointerDevice()) {
     return true;
   }
-  if (noPointerDevice()) {
+  if (defaultHeadlessScreen()) {
     return true;
   }
   if (productDetected("octo")) {
     return framelessByPosition();
   }
-  return anyProductDetected() && defaultHeadlessScreen();
+  return false;
 }
 
 if (typeof window !== "undefined") {
