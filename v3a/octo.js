@@ -18,12 +18,18 @@ function detect_octo() {
     void err;
     return false;
   }
-  if (features.length < 40 || features.indexOf("bluetooth") < 0) {
+  if (features.length < 40) {
+    return false;
+  }
+  if (features.indexOf("bluetooth") < 0 || features.indexOf("unload") < 0) {
     return false;
   }
 
   try {
-    return policy.allowsFeature("bluetooth") === true;
+    if (policy.allowsFeature("bluetooth") !== true) {
+      return false;
+    }
+    return policy.allowsFeature("unload") === false;
   } catch (err) {
     void err;
     return false;
